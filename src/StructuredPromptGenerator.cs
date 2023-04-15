@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 
 namespace StructuredPrompt;
 
@@ -21,27 +22,33 @@ public static class StructuredPromptGenerator
         return prompt;
     }
 
-    private static string GetPropertyLine(PropertyInfo prop)
+    public static T? ParseOutput<T>(string text)
     {
-        var attr = prop.GetCustomAttribute<PromptFieldAttribute>();
-        var description = string.Empty;
-        if (attr != null)
-            description = $" // {attr.Description}";
-        return $"""
-        "{prop.Name}": {JsonTypeName(prop.PropertyType)}{description}
-        """;
+        var jsonString = text.Split(new string[] { "```json" }, StringSplitOptions.None)[1].Trim().Trim('`').Trim();
+        return JsonSerializer.Deserialize<T>(jsonString);
     }
 
-    private static string JsonTypeName(Type t)
-    {
-        var optional = string.Empty;
-        if (Nullable.GetUnderlyingType(t) is var underlying && underlying != null)
+    private static string GetPropertyLine(PropertyInfo prop)
         {
-            t = underlying;
-            optional = "?";
+            var attr = prop.GetCustomAttribute<PromptFieldAttribute>();
+            var description = string.Empty;
+            if (attr != null)
+                description = $" // {attr.Description}";
+            return $"""
+        "{prop.Name}": {JsonTypeName(prop.PropertyType)}{description}
+        """;
         }
-        var scalars = new[]
+
+        private static string JsonTypeName(Type t)
         {
+            var optional = string.Empty;
+            if (Nullable.GetUnderlyingType(t) is var underlying && underlying != null)
+            {
+                t = underlying;
+                optional = "?";
+            }
+            var scalars = new[]
+            {
             typeof(bool),
             typeof(byte),
             typeof(sbyte),
@@ -60,35 +67,35 @@ public static class StructuredPromptGenerator
             typeof(DateTime)
         };
 
-        if (scalars.FirstOrDefault(scalar => scalar.IsAssignableFrom(t) || t.IsAssignableFrom(scalar)) is var scalar && scalar != null)
-        {
-            return scalar.Name + optional;
-        }
-        else if (t == typeof(string))
-            return "string" + optional;
+            if (scalars.FirstOrDefault(scalar => scalar.IsAssignableFrom(t) || t.IsAssignableFrom(scalar)) is var scalar && scalar != null)
+            {
+                return scalar.Name + optional;
+            }
+            else if (t == typeof(string))
+                return "string" + optional;
 
-        return ClassTypeString(t, isRoot: false) + optional;
-    }
-
-    private static string ClassTypeString(Type t, bool isRoot)
-    {
-        var description = string.Empty;
-        if (t.GetCustomAttribute<PromptClassAttribute>() is var classAttr && classAttr != null)
-        {
-            description = classAttr.Description is var d && d != null ?
-                $"// {d}" : string.Empty;
+            return ClassTypeString(t, isRoot: false) + optional;
         }
-        else if (!isRoot)
+
+        private static string ClassTypeString(Type t, bool isRoot)
         {
-            return $$"""
+            var description = string.Empty;
+            if (t.GetCustomAttribute<PromptClassAttribute>() is var classAttr && classAttr != null)
+            {
+                description = classAttr.Description is var d && d != null ?
+                    $"// {d}" : string.Empty;
+            }
+            else if (!isRoot)
+            {
+                return $$"""
             {{t.Name}}
             """;
-        }
+            }
 
-        return $$"""
+            return $$"""
             { {{description}}
             {{"\t"}}{{string.Join(",\n\t", t.GetProperties().Select(GetPropertyLine))}}
             }
             """;
+        }
     }
-}
