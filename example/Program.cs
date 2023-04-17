@@ -23,7 +23,7 @@ Console.WriteLine(JsonSerializer.Serialize(responseObject));
 
 public class Outer
 {
-    public int A { get; set; }
+    public int? A { get; set; }
     public int? B { get; set; }
     [PromptField("Before Jan 2020")]
     public DateOnly? Date { get; set; }
@@ -34,5 +34,7 @@ public class Outer
 [PromptClass]
 public class Inner
 {
-    public int InnerInt { get; set; }
+    public int? InnerInt { get; set; }
+    [PromptField("inner list")]
+    public List<string>? InnerList { get; set; }
 }

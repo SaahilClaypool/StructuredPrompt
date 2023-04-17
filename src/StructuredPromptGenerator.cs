@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace StructuredPrompt;
 
@@ -80,6 +82,15 @@ public static class StructuredPromptGenerator
         private static string ClassTypeString(Type t, bool isRoot)
         {
             var description = string.Empty;
+            if (t.GetInterfaces().FirstOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                is var enumerableType && enumerableType != null)
+            {
+                return $"""
+                [
+                    {JsonTypeName(enumerableType.GenericTypeArguments[0])}
+                ]
+                """;
+            }
             if (t.GetCustomAttribute<PromptClassAttribute>() is var classAttr && classAttr != null)
             {
                 description = classAttr.Description is var d && d != null ?
@@ -87,9 +98,7 @@ public static class StructuredPromptGenerator
             }
             else if (!isRoot)
             {
-                return $$"""
-            {{t.Name}}
-            """;
+                return t.Name;
             }
 
             return $$"""
